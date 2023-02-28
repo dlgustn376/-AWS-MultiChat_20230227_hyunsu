@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.List;
+import java.util.Map;
 
 import javax.swing.JOptionPane;
 
@@ -46,9 +48,41 @@ public class ClientRecive extends Thread {
 			case "usernameCheckIsDuplicate":
 				JOptionPane.showMessageDialog(null, (String) responseDto.getBody(),"접속오류", JOptionPane.WARNING_MESSAGE);
 				break;
+			case "usernameCheckSuccessfully":
+				ClientApplication.getInstance()
+								.getMaincard()
+								.show(ClientApplication.getInstance().getMainPanel(), "roomListPanel");
+				break;
+				
+			case "refreshRoomList":
+				refreshRoomList((List<Map<String,String>>)responseDto.getBody());
+				break;
+			case "createRoomSuccessfully":
+				ClientApplication.getInstance()
+								.getMaincard()
+								.show(ClientApplication.getInstance().getMainPanel(), "roomPanel");
+				break;
+			case "refreshUsernameList":
+				refreshUsernameList((List<String>)responseDto.getBody() );
+				break;
+				
 			default:
 				break;
 
 		}
 	}
+	
+	private void refreshRoomList(List<Map<String,String>> roomList) {
+		ClientApplication.getInstance().getRoomNameListModel().clear();
+		ClientApplication.getInstance().setRoomInfoList(roomList);
+		for(Map<String, String> roomInfo : roomList) {
+			ClientApplication.getInstance().getRoomNameListModel().addElement(roomInfo.get("roomName"));
+		}
+	}
+	
+	private void refreshUsernameList(List<String> usernameList) {
+		ClientApplication.getInstance().getRoomNameListModel().clear();
+		ClientApplication.getInstance().getUsernameListModel().addAll(usernameList);
+	}
+	
 }

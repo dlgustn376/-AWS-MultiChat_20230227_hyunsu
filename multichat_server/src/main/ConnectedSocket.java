@@ -7,18 +7,23 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.gson.Gson;
 
 import dto.request.RequestDto;
 import dto.response.ResponseDto;
+import entity.Room;
 import lombok.Getter;
 
 @Getter
 public class ConnectedSocket extends Thread {
 	
 	private static List<ConnectedSocket> connectedSocketList = new ArrayList<>();
+	private static List<Room> roomList = new ArrayList<>();
+	private static int index = 0;
 	private Socket socket;
 	private String username;
 	
@@ -27,6 +32,9 @@ public class ConnectedSocket extends Thread {
 	public ConnectedSocket(Socket socket) {
 		this.socket = socket;
 		gson = new Gson();
+		Room room = new Room("testroom" + index, "testUser");
+		index++;
+		roomList.add(room);
 	}
 	
 	@Override
@@ -53,6 +61,15 @@ public class ConnectedSocket extends Thread {
 			case "usernameCheck":
 				checkUsername((String)requestDto.getBody());
 				break;
+			case "createRoom":
+				Room room = new Room((String)requestDto.getBody(), username);
+				room.getUsers().add(this);
+				roomList.add(room);
+				ResponseDto<String> responseDto = new ResponseDto<String>("createRoomSuccessfully", null);
+				sendToMe(responseDto);
+				refreshUsernameList(username);
+				sendToAll(refreshRoomList(), connectedSocketList);
+				break;
 		}
 	}
 	
@@ -61,16 +78,71 @@ public class ConnectedSocket extends Thread {
 			sendToMe(new ResponseDto<String>("usernameCheckIsBlank", "사용자의 이름은 공백일 수 없습니다."));
 			return;
 		}
+		
 		for (ConnectedSocket connectedSocket : connectedSocketList) {
 			if(connectedSocket.getUsername().equals(username)) {
 				sendToMe(new ResponseDto<String>("usernameCheckIsDuplicate", "이미 사용중인 이름입니다."));
 				return;
 			}
 		}
+		
 		this.username = username;
 		connectedSocketList.add(this);
 		sendToMe(new ResponseDto<String>("usernameCheckSuccessfully", null));
+		sendToMe(refreshRoomList());
 		
+	}
+	
+//		방리스트 초기화
+	private ResponseDto<List<Map<String, String>>> refreshRoomList() {
+		List<Map<String, String>> roomNameList = new ArrayList<>();
+		for(Room room : roomList) {
+			Map<String, String> roomInfo = new HashMap<>();
+			roomInfo.put("roomName", room.getRoomName());
+			roomInfo.put("owner", room.getOwner());
+			roomNameList.add(roomInfo);
+		}
+		
+		
+		ResponseDto<List<Map<String, String>>> responseDto = 
+				new ResponseDto<List<Map<String, String>>>("refreshRoomList", roomNameList);
+		return responseDto;
+	}
+	private Room findConnectedRoom(String username) {
+		Room room = null;
+		for(Room r : roomList) {
+			for(ConnectedSocket cs : r.getUsers()) {
+				if(cs.getUsername().equals(username)) {
+					return r;
+				}
+			}
+		}
+		return null;
+	}
+	
+	private Room findRoom(Map<String, String> roomInfo) {
+		for(Room room : roomList) {
+			if(room.getRoomName().equals(roomInfo.get("roomName")) 
+					&& room.getOwner().equals(roomInfo.get("owner"))) {
+				return room;
+			}
+		}
+		return null;
+	}
+	
+	private void refreshUsernameList(String username){
+		Room room = findConnectedRoom(username);
+		List<String> usernameList = new ArrayList<>();
+		usernameList.add("방제목: " + room.getRoomName());
+		for(ConnectedSocket connectedSocket: room.getUsers()) {
+			if(connectedSocket.getUsername().equals(room.getOwner())) {
+				usernameList.add(connectedSocket.getUsername() + "(방장)");
+				continue;
+			}
+			usernameList.add(connectedSocket.getUsername());
+		}
+		ResponseDto<List<String>> responseDto = new ResponseDto<List<String>>("refreshUsernameList", usernameList);
+		sendToAll(responseDto, room.getUsers());
 	}
 	
 	private void sendToMe(ResponseDto<?> responseDto) {
@@ -86,8 +158,18 @@ public class ConnectedSocket extends Thread {
 		
 	}
 	
-	private void snedToAll() {
-		
+	private void sendToAll(ResponseDto<?> responseDto, List<ConnectedSocket> connectedSockets) {
+		for(ConnectedSocket connectedSocket : connectedSockets) {
+			try {
+				OutputStream outputStream = connectedSocket.getSocket().getOutputStream();
+				PrintWriter printWriter = new PrintWriter(outputStream,true);
+				
+				String responseJson = gson.toJson(responseDto);
+				printWriter.println(responseJson);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 	
 }
