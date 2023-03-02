@@ -3,16 +3,17 @@ package main;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 
 import javax.swing.JFrame;
 
 public class ServerApplication {
 	public static void main(String[] args) {
 		// serverFrame을 닫으면 서버거 종료됨.
-		JFrame serverFrame = new JFrame("서버");
-		serverFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		serverFrame.setSize(300, 300);
-		serverFrame.setVisible(true);
+//		JFrame serverFrame = new JFrame("서버");
+//		serverFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//		serverFrame.setSize(300, 300);
+//		serverFrame.setVisible(true);
 		
 		try {
 			ServerSocket serverSocket = new ServerSocket(9090);
